@@ -1,0 +1,196 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home page";
+}
+<style>
+    *::-webkit-scrollbar {
+        display: none;
+    }
+</style>
+<input type="hidden" name="currentNode" value="0" />
+<div class="content-block">
+    <div class="row p-0 m-0">
+        <button id="btn-connect" class="btn btn-primary m-1">Connect</button>
+        <button id="btn-switch-tree" class="btn btn-success m-1" data-type-of-tree="full">Switch tree</button>
+    </div>
+    <div class="row p-0 m-0">
+        <div id="nodes" class="col-2 p-0 m-1 overflow-auto" style="height: 700px;">
+            <h4 class="w-100">Nodes</h4>
+        </div>
+        <div id="activeNodes" class="col p-0 m-1 overflow-auto" style="height: 700px;">
+            <h4 class="w-100">Active list</h4>
+            <div class="card"></div>
+        </div>
+        <div id="childrenNodes" class="col p-0 m-1 overflow-auto" style="height: 700px;">
+            <h4 class="w-100">Children list</h4>
+            <div class="card"></div>
+        </div>
+        <div id="tree" class="col-8 p-0 m-1 overflow-auto" style="height: 700px;">
+            <h4 class="w-100">Tree</h4>
+            <div id="treeContainer" class="w-100" style="height: 800px"></div>
+        </div>
+    </div>
+</div>
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.min.js" integrity="sha512-UCd2sYwLBKzQ/kMciPoz3unDxlIqYDH/Av525wcK6GRXOO0XekfvVhv+7me7mDO4BoypCLtCBxx+ciTQkEB4HA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+
+    var network;
+
+    var container = document.getElementById("treeContainer");
+    var nodesConteiner = $('#nodes');
+    var btnConnect = $('button[id="btn-connect"]');
+    var btnSwitchTree = $('button[id="btn-switch-tree"]');
+    var currentNode = $('input[name="currentNode"]');
+    var tree = $('div[id="tree"]');
+    var contentBlock = $('.content-block');
+
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/commonhub")
+        .configureLogging(signalR.LogLevel.Information)
+        .build();
+
+    async function start() {
+        try {
+            await connection.start();
+            console.log("SignalR Connected.");
+        } catch (err) {
+            console.log(err);
+            setTimeout(start, 5000);
+        }
+    };
+
+    connection.onclose(async () => {
+        await start();
+    });
+
+    connection.on('NewNode', (id) => {
+        //console.log(`Ping: ${id}`);
+    });
+
+    connection.on('NodeStart', (id) => {
+        GetNodes();
+    });
+
+    connection.on('NodeStop', (id) => {
+        GetNodes();
+    });
+
+    connection.on('Rebuild', (id) => {
+        GetNodes();
+        var type = $(event.target).data('type-of-tree');
+        var node = $('input[name="currentNode"]').val();
+        if (type == 'active') {
+            debugger;
+            $.ajax({
+                type: "GET",
+                url: "Manager/GetActiveTree",
+                data: { id: node },
+                success: function (result) {
+                    if (result != undefined) {
+                        LoadTree(result.nodes, result.edges);
+                    }
+                },
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+        else {
+            $.ajax({
+                type: "GET",
+                url: "Manager/GetFullTree",
+                data: { id: node },
+                success: function (result) {
+                    if (result != undefined) {
+                        LoadTree(result.nodes, result.edges);
+                    }
+                },
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+    });
+
+    btnConnect.on('click', () => {
+        $.ajax({
+            type: "GET",
+            url: "Manager/Connect",
+            data: JSON.stringify({}),
+            success: function (result) {
+                GetNodes();
+            },
+            headers: { 'Content-Type': 'application/json' }
+        });
+    });
+
+    btnSwitchTree.on('click', (event) => {
+        var type = $(event.target).data('type-of-tree');
+        var node = $('input[name="currentNode"]').val();
+        if (type == 'full') {
+            $(event.target).data('type-of-tree', 'active');
+            debugger;
+            $.ajax({
+                type: "GET",
+                url: "Manager/GetActiveTree",
+                data: { id: node },
+                success: function (result) {
+                    if (result != undefined) {
+                        LoadTree(result.nodes, result.edges);
+                    }
+                },
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+        else {
+            $(event.target).data('type-of-tree', 'full');
+            $.ajax({
+                type: "GET",
+                url: "Manager/GetFullTree",
+                data: { id: node },
+                success: function (result) {
+                    if (result != undefined) {
+                        LoadTree(result.nodes, result.edges);
+                    }
+                },
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+    });
+
+    function GetNodes() {
+        $.ajax({
+            type: "GET",
+            url: "Monitor/_GetNodes",
+            data: JSON.stringify({}),
+            success: function (result) {
+                nodesConteiner.html(result);
+            },
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
+    function LoadTree(nodes, edges) {
+        var data = {
+            nodes: nodes,
+            edges: edges,
+        };
+        var options = {
+            layout: {
+                randomSeed: 10,
+                hierarchical: {
+                    treeSpacing: 600
+                },
+            },
+            nodes: {
+                shape: "dot",
+                size: 10,
+            },
+        };
+        $(container).empty();
+        network = new vis.Network(container, data, options);
+    }
+
+    start();
+    GetNodes();
+
+</script>

@@ -1,0 +1,91 @@
+﻿@model IEnumerable<NodeHub.Models.Monitor.NodeModel>
+@using System.Numerics;
+@*
+    For more information on enabling MVC for empty projects, visit http://go.microsoft.com/fwlink/?LinkID=397860
+*@
+<h4 class="w-100">Nodes</h4>
+<ul class="list-group">
+    @foreach (var node in Model)
+    {
+        if (node.Online)
+        {
+            if (node.Master == BigInteger.Zero)
+            {
+                <li id="nodeli" data-id="@node.ID" class="list-group-item border-primary" style="border-left-width: 5px !important;">ID: @node.ID Online: @node.Online <span class="badge bg-secondary text-white">@node.Master</span> <button id="btn-node-stop" data-id="@node.ID" onclick="stop(@node.ID)" class="btn btn-primary float-right">Stop</button></li>
+            }
+            else
+            {
+                <li id="nodeli" data-id="@node.ID" class="list-group-item border-success" style="border-left-width: 5px !important;">ID: @node.ID Online: @node.Online <span class="badge bg-secondary text-white">@node.Master</span> <button id="btn-node-stop" data-id="@node.ID" onclick="stop(@node.ID)" class="btn btn-primary float-right">Stop</button></li>
+            }
+        }
+        else
+        {
+            <li id="nodeli" data-id="@node.ID" class="list-group-item border-warning" style="border-left-width: 5px !important;">ID: @node.ID Online: @node.Online <span class="badge bg-secondary text-white">@node.Master</span> <button id="btn-node-start" data-id="@node.ID" onclick="start(@node.ID)" class="btn btn-primary float-right">Start</button></li>
+        }
+    }
+</ul>
+<script>
+    var btnStop = $('button #btn-node-stop');
+    var btnStart = $('button #btn-node-start');
+    var nodeli = $('li[id="nodeli"]');
+    var currentNode = $('input[name="currentNode"]');
+    var activeNodeContainer = $('#activeNodes');
+    var btnSwitchTree = $('button[id="btn-switch-tree"]');
+
+    function stop(id) {
+        $.ajax({
+            type: "GET",
+            url: "Manager/NodeStop",
+            data: { id: id },
+            success: function (result) {
+                nodesConteiner.html(result);
+            },
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
+    function start(id) {
+        $.ajax({
+            type: "GET",
+            url: "Manager/NodeStart",
+            data: { id: id },
+            success: function (result) {
+                nodesConteiner.html(result);
+            },
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
+    function GetActiveNodes(id) {
+        $.ajax({
+            type: "GET",
+            url: "Monitor/_GetActiveNodes",
+            data: { id: id },
+            success: function (result) {
+                activeNodeContainer.html(result);
+            },
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
+    function GetFullTree(id) {
+        btnSwitchTree.data('type-of-tree', 'full');
+        $.ajax({
+            type: "GET",
+            url: "Manager/GetFullTree",
+            data: { id: id },
+            success: function (result) {
+                if (result != undefined) {
+                    LoadTree(result.nodes, result.edges);
+                }
+            },
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
+    nodeli.bind('click', (event) => {
+        currentNode.val($(event.target).data('id'));
+        GetActiveNodes($(event.target).data('id'));
+        GetFullTree($(event.target).data('id'));
+    });
+</script>

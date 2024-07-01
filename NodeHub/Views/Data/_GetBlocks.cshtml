@@ -1,0 +1,37 @@
+﻿@model List<NodeHub.Models.Data.Node>
+<div class="row m-0">
+    @foreach (var node in Model)
+    {
+    <div class="col p-0">
+        <div class="w-100 p-1 text-center">@node.ID</div>
+        @if (node.Groups != null && node.IsActive)
+        {
+            foreach (var group in node.Groups)
+            {
+            <div class="row border border-primary" style="border-width: 2px !important; margin: 2px;">
+                <div class="w-100 p-1 text-center">@group.ID</div>
+                @foreach (var block in group.Blocks)
+                {
+                <div class="p-1 text-center w-100" style="margin: 0 4px 4px 4px !important; background: #D9ECFC;" title="Files: @block.Files.Aggregate(string.Empty,(s, v) => s += $"{v} ")">
+                    <div class="row m-0">
+                        <div class="col p-0"><b>@block.ID</b></div>
+                        @foreach (var replica in block.Replicas)
+                        {
+                            if (replica.Type == "Primary")
+                            {
+                                <div class="col text-primary p-0" style="margin-left: 4px !important;" title="Node: @replica.ID"><b>P</b></div>
+                            }
+                            else 
+                            {
+                                <div class="col text-warning p-0" style="margin-left: 4px !important;" title="Node: @replica.ID"><b>S</b></div>
+                            }
+                        }
+                    </div>
+                </div>
+                }
+            </div>
+            }
+        }
+    </div>
+    }
+</div>

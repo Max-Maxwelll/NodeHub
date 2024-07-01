@@ -1,0 +1,153 @@
+﻿@page
+@model NodeHub.Pages.DataModel
+@{
+}
+<style>
+    *::-webkit-scrollbar {
+        display: none;
+    }
+</style>
+<input type="hidden" name="currentNode" value="0" />
+<div class="content-block">
+    <div class="row p-0 m-0">
+        <div class="form-row">
+            <div class="form-group col-md-2">
+                <input class="form-control" id="receiver" type="text" name="receiver" value="" placeholder="Node id" />
+            </div>
+            <div class="form-group col-md-2">
+                <input class="form-control" id="file" type="text" name="file" value="" placeholder="File id" />
+            </div>
+            <div class="form-group col-md-2">
+                <input class="form-control" id="block" type="text" name="block" value="" placeholder="Block id" />
+            </div>
+            <div class="form-group col-md-2">
+                <button id="btn-send-block" class="btn btn-success">Send</button>
+                <button id="btn-get-block" class="btn btn-primary">Get</button>
+            </div>
+            <div class="form-group col-md-4">
+                <span id="block-result"></span>
+            </div>
+        </div>
+    </div>
+    <div class="row p-0 m-0">
+        <div id="nodes" class="col-2 p-0 m-1 overflow-auto" style="height: 700px;">
+            <h4 class="w-100">Nodes</h4>
+        </div>
+        <div id="blocks" class="col p-0 m-1 overflow-auto" style="height: 700px;">
+            @*<h4 class="w-100">Active list</h4>*@
+            <div class="card"></div>
+        </div>
+    </div>
+</div>
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.min.js" integrity="sha512-UCd2sYwLBKzQ/kMciPoz3unDxlIqYDH/Av525wcK6GRXOO0XekfvVhv+7me7mDO4BoypCLtCBxx+ciTQkEB4HA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+
+    var network;
+
+    var container = document.getElementById("treeContainer");
+    var nodesConteiner = $('#nodes');
+    var currentNode = $('input[name="currentNode"]');
+    var blocksContainer = $('#blocks');
+    var receiver = $('#receiver');
+    var fileid = $('#file');
+    var blockid = $('#block');
+    var btnSend = $('#btn-send-block');
+    var btnGet = $('#btn-get-block');
+    var blockResult = $('#block-result');
+
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/commonhub")
+        .configureLogging(signalR.LogLevel.Information)
+        .build();
+
+    async function start() {
+        try {
+            await connection.start();
+            console.log("SignalR Connected.");
+        } catch (err) {
+            console.log(err);
+            setTimeout(start, 5000);
+        }
+    };
+
+    btnSend.on('click', () => {
+        $.ajax({
+            type: "GET",
+            url: "Data/SendBlock",
+            data: { receiver: receiver.val(), file: fileid.val(), block: blockid.val() },
+            success: function (result) {
+                GetBlocks();
+            },
+            headers: { 'Content-Type': 'application/json' }
+        });
+    });
+
+    btnGet.on('click', () => {
+        $.ajax({
+            type: "GET",
+            url: "Data/GetBlock",
+            data: { receiver: receiver.val(), block: blockid.val() },
+            success: function (result) {
+                console.log(result);
+                blockResult.html(`Received ${result.blockLength} bytes. Chain [${result.chain.join(',')}]`);
+            },
+            headers: { 'Content-Type': 'application/json' }
+        });
+    });
+
+    connection.onclose(async () => {
+        await start();
+    });
+
+    connection.on('NewNode', (id) => {
+        //console.log(`Ping: ${id}`);
+    });
+
+    connection.on('NodeStart', (id) => {
+        GetNodes();
+    });
+
+    connection.on('NodeStop', (id) => {
+        GetNodes();
+    });
+
+    connection.on('Rebuild', (id) => {
+        GetNodes();
+    });
+
+    connection.on('AddBlock', (id) => {
+        GetBlocks();
+    });
+
+    function GetNodes() {
+        $.ajax({
+            type: "GET",
+            url: "Monitor/_GetNodes",
+            data: JSON.stringify({}),
+            success: function (result) {
+                nodesConteiner.html(result);
+            },
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
+    function GetBlocks() {
+        $.ajax({
+            type: "GET",
+            url: "Data/_GetBlocks",
+            data: {},
+            success: function (result) {
+                console.log(result);
+                blocksContainer.html(result);
+            },
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
+    start();
+    GetNodes();
+    GetBlocks();
+
+</script>
